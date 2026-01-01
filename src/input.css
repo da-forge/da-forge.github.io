@@ -1,1 +1,37 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --color-background: oklch(15% 0.005 285.82);
+  --color-foreground: oklch(98% 0.005 285.82);
+  --color-card: oklch(17% 0.005 285.82);
+  --color-card-foreground: oklch(98% 0.005 285.82);
+  --color-popover: oklch(15% 0.005 285.82);
+  --color-popover-foreground: oklch(98% 0.005 285.82);
+  --color-primary: oklch(82% 0.15 264);
+  --color-primary-foreground: oklch(15% 0.005 285.82);
+  --color-secondary: oklch(25% 0.01 285.82);
+  --color-secondary-foreground: oklch(98% 0.005 285.82);
+  --color-muted: oklch(25% 0.01 285.82);
+  --color-muted-foreground: oklch(65% 0.02 285.82);
+  --color-accent: oklch(25% 0.01 285.82);
+  --color-accent-foreground: oklch(98% 0.005 285.82);
+  --color-destructive: oklch(62% 0.24 27);
+  --color-destructive-foreground: oklch(98% 0 0);
+  --color-border: oklch(27% 0.01 285.82);
+  --color-input: oklch(27% 0.01 285.82);
+  --color-ring: oklch(82% 0.15 264);
+  --radius: 0.5rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
+  }
+}

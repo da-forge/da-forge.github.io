@@ -203,19 +203,32 @@ class GitHubClient {
   }
 
   /**
-   * Get decoded README content
+   * Get decoded README content with metadata
    */
-  async getReadmeContent(owner: string, repo: string): Promise<string> {
+  async getReadmeWithContent(
+    owner: string,
+    repo: string,
+  ): Promise<{ content: string; name: string } | null> {
     try {
       const readme = await this.getReadme(owner, repo);
+      let content = readme.content;
       if (readme.encoding === "base64") {
-        return atob(readme.content);
+        // Properly decode base64 with UTF-8 support
+        content = decodeURIComponent(
+          atob(content)
+            .split("")
+            .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+            .join(""),
+        );
       }
-      return readme.content;
+      return {
+        content,
+        name: readme.name,
+      };
     } catch (error) {
       // README might not exist
       if ((error as ApiError).status === 404) {
-        return "";
+        return null;
       }
       throw error;
     }

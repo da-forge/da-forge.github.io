@@ -12,7 +12,7 @@ type LoadingState = "loading" | "success" | "error";
 export function RepositoryView() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
   const [repository, setRepository] = useState<GitHubRepository | null>(null);
-  const [readme, setReadme] = useState<string>("");
+  const [readmeData, setReadmeData] = useState<{ content: string; name: string } | null>(null);
   const [state, setState] = useState<LoadingState>("loading");
   const [error, setError] = useState<string | null>(null);
 
@@ -29,13 +29,13 @@ export function RepositoryView() {
 
       try {
         // Fetch repository and README in parallel
-        const [repoData, readmeContent] = await Promise.all([
+        const [repoData, readme] = await Promise.all([
           githubClient.getRepository(owner, repo),
-          githubClient.getReadmeContent(owner, repo).catch(() => ""),
+          githubClient.getReadmeWithContent(owner, repo).catch(() => null),
         ]);
 
         setRepository(repoData);
-        setReadme(readmeContent);
+        setReadmeData(readme);
         setState("success");
       } catch (err) {
         setState("error");
@@ -92,16 +92,23 @@ export function RepositoryView() {
     );
   }
 
+  // Construct the base URL for raw content on GitHub (without trailing slash)
+  const rawContentBaseUrl = `https://raw.githubusercontent.com/${repository.owner.login}/${repository.name}/${repository.default_branch}`;
+
   return (
     <div className="container mx-auto px-4 py-8">
       <RepoHeader repo={repository} />
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">README.md</CardTitle>
+          <CardTitle className="text-lg">{readmeData?.name || "README"}</CardTitle>
         </CardHeader>
         <CardContent>
-          <ReadmeViewer content={readme} />
+          <ReadmeViewer
+            content={readmeData?.content || ""}
+            filename={readmeData?.name || ""}
+            baseUrl={rawContentBaseUrl}
+          />
         </CardContent>
       </Card>
     </div>

@@ -7,10 +7,23 @@ import {
   ExternalLink,
   GitPullRequest,
   Circle,
+  Download,
+  Copy,
+  Check,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Link, useLocation } from "react-router-dom";
 import { type GitHubRepository } from "@/lib/github-api";
+import { useState } from "react";
 
 interface RepoHeaderProps {
   repo: GitHubRepository;
@@ -19,6 +32,7 @@ interface RepoHeaderProps {
 export function RepoHeader({ repo }: RepoHeaderProps) {
   const location = useLocation();
   const basePath = `/r/${repo.owner.login}/${repo.name}`;
+  const [copiedType, setCopiedType] = useState<string | null>(null);
 
   // Determine active tab based on current path
   const getActiveTab = () => {
@@ -28,6 +42,24 @@ export function RepoHeader({ repo }: RepoHeaderProps) {
   };
 
   const activeTab = getActiveTab();
+
+  // Clone URLs and commands
+  const cloneUrls = {
+    ssh: `git@github.com:${repo.owner.login}/${repo.name}.git`,
+    https: `https://github.com/${repo.owner.login}/${repo.name}.git`,
+    gh: `gh repo clone ${repo.owner.login}/${repo.name}`,
+    zip: `https://github.com/${repo.owner.login}/${repo.name}/archive/refs/heads/${repo.default_branch}.zip`,
+  };
+
+  const copyToClipboard = async (text: string, type: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedType(type);
+      setTimeout(() => setCopiedType(null), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
 
   return (
     <div className="border-b border-border pb-6 mb-6">
@@ -78,6 +110,63 @@ export function RepoHeader({ repo }: RepoHeaderProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <Download className="h-4 w-4" />
+                <span>Clone</span>
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-80">
+              <DropdownMenuLabel>Clone with SSH</DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={() => copyToClipboard(cloneUrls.ssh, "ssh")}
+                className="flex items-center justify-between cursor-pointer"
+              >
+                <code className="text-xs flex-1 truncate mr-2">{cloneUrls.ssh}</code>
+                {copiedType === "ssh" ? (
+                  <Check className="h-4 w-4 text-green-600 shrink-0" />
+                ) : (
+                  <Copy className="h-4 w-4 shrink-0" />
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Clone with HTTPS</DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={() => copyToClipboard(cloneUrls.https, "https")}
+                className="flex items-center justify-between cursor-pointer"
+              >
+                <code className="text-xs flex-1 truncate mr-2">{cloneUrls.https}</code>
+                {copiedType === "https" ? (
+                  <Check className="h-4 w-4 text-green-600 shrink-0" />
+                ) : (
+                  <Copy className="h-4 w-4 shrink-0" />
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Clone with GitHub CLI</DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={() => copyToClipboard(cloneUrls.gh, "gh")}
+                className="flex items-center justify-between cursor-pointer"
+              >
+                <code className="text-xs flex-1 truncate mr-2">{cloneUrls.gh}</code>
+                {copiedType === "gh" ? (
+                  <Check className="h-4 w-4 text-green-600 shrink-0" />
+                ) : (
+                  <Copy className="h-4 w-4 shrink-0" />
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => window.open(cloneUrls.zip, "_blank")}
+                className="flex items-center gap-2 cursor-pointer"
+              >
+                <Download className="h-4 w-4" />
+                <span>Download ZIP</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button variant="outline" size="sm" className="gap-1.5" asChild>
             <a href={`${repo.html_url}/stargazers`} target="_blank" rel="noopener noreferrer">
               <Star className="h-4 w-4" />

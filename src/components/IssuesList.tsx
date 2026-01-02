@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Loader2, AlertCircle, GitBranch, Circle } from "lucide-react";
+import { AlertCircle, GitBranch, Circle } from "lucide-react";
 import { githubClient, type GitHubIssue, type ApiError } from "@/lib/github-api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type LoadingState = "loading" | "success" | "error";
 type IssueState = "open" | "closed" | "all";
+
+const PER_PAGE = 30;
 
 export function IssuesList() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
@@ -14,6 +17,9 @@ export function IssuesList() {
   const [state, setState] = useState<LoadingState>("loading");
   const [error, setError] = useState<string | null>(null);
   const [issueState, setIssueState] = useState<IssueState>("open");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     async function loadIssues() {
@@ -25,12 +31,15 @@ export function IssuesList() {
 
       setState("loading");
       setError(null);
+      setCurrentPage(1);
+      setHasMore(false);
 
       try {
-        const issuesData = await githubClient.getIssues(owner, repo, issueState);
+        const issuesData = await githubClient.getIssues(owner, repo, issueState, 1, PER_PAGE);
         // Filter out pull requests (they have pull_request property)
         const issuesOnly = issuesData.filter((issue) => !issue.pull_request);
         setIssues(issuesOnly);
+        setHasMore(issuesData.length === PER_PAGE);
         setState("success");
       } catch (err) {
         setState("error");
@@ -48,12 +57,58 @@ export function IssuesList() {
     loadIssues();
   }, [owner, repo, issueState]);
 
+  const loadMoreIssues = async () => {
+    if (loadingMore || !hasMore) return;
+
+    setLoadingMore(true);
+    try {
+      const nextPage = currentPage + 1;
+      const issuesData = await githubClient.getIssues(
+        owner!,
+        repo!,
+        issueState,
+        nextPage,
+        PER_PAGE,
+      );
+      // Filter out pull requests (they have pull_request property)
+      const issuesOnly = issuesData.filter((issue) => !issue.pull_request);
+      setIssues((prev) => [...prev, ...issuesOnly]);
+      setCurrentPage(nextPage);
+      setHasMore(issuesData.length === PER_PAGE);
+    } catch (err) {
+      const apiError = err as ApiError;
+      setError(apiError.message || "Failed to load more issues");
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   if (state === "loading") {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
-          <p className="text-muted-foreground">Loading issues...</p>
+      <div className="space-y-4">
+        <div className="flex gap-2 border-b border-border pb-2">
+          <Skeleton className="h-9 w-16" />
+          <Skeleton className="h-9 w-16" />
+          <Skeleton className="h-9 w-16" />
+        </div>
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-start gap-3">
+                  <Skeleton className="h-5 w-5 rounded-full shrink-0 mt-1" />
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <Skeleton className="h-5 w-3/4" />
+                    <div className="flex gap-3">
+                      <Skeleton className="h-4 w-16" />
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-4 w-20" />
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </div>
     );
@@ -119,71 +174,94 @@ export function IssuesList() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {issues.map((issue) => (
-            <Card key={issue.id} className="hover:bg-accent/50 transition-colors">
-              <a href={issue.html_url} target="_blank" rel="noopener noreferrer" className="block">
-                <CardContent className="pt-4 pb-4">
-                  <div className="flex items-start gap-3">
-                    <div className="shrink-0 mt-1">
-                      {issue.state === "open" ? (
-                        <Circle className="h-5 w-5 text-green-500 fill-current" />
-                      ) : (
-                        <Circle className="h-5 w-5 text-purple-500 fill-current" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                        <span className="font-medium text-foreground hover:text-primary transition-colors line-clamp-2 sm:line-clamp-1">
-                          {issue.title}
-                        </span>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {issue.labels.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {issue.labels.slice(0, 3).map((label) => (
-                                <span
-                                  key={label.id}
-                                  className="px-2 py-0.5 text-xs rounded-full border"
-                                  style={{
-                                    backgroundColor: `#${label.color}20`,
-                                    borderColor: `#${label.color}40`,
-                                    color: `#${label.color}`,
-                                  }}
-                                >
-                                  {label.name}
-                                </span>
-                              ))}
-                              {issue.labels.length > 3 && (
-                                <span className="px-2 py-0.5 text-xs text-muted-foreground">
-                                  +{issue.labels.length - 3}
-                                </span>
-                              )}
-                            </div>
+        <>
+          <div className="space-y-3">
+            {issues.map((issue) => (
+              <Card key={issue.id} className="hover:bg-accent/50 transition-colors">
+                <a
+                  href={issue.html_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block"
+                >
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-start gap-3">
+                      <div className="shrink-0 mt-1">
+                        {issue.state === "open" ? (
+                          <Circle className="h-5 w-5 text-green-500 fill-current" />
+                        ) : (
+                          <Circle className="h-5 w-5 text-purple-500 fill-current" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                          <span className="font-medium text-foreground hover:text-primary transition-colors line-clamp-2 sm:line-clamp-1">
+                            {issue.title}
+                          </span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {issue.labels.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {issue.labels.slice(0, 3).map((label) => (
+                                  <span
+                                    key={label.id}
+                                    className="px-2 py-0.5 text-xs rounded-full border"
+                                    style={{
+                                      backgroundColor: `#${label.color}20`,
+                                      borderColor: `#${label.color}40`,
+                                      color: `#${label.color}`,
+                                    }}
+                                  >
+                                    {label.name}
+                                  </span>
+                                ))}
+                                {issue.labels.length > 3 && (
+                                  <span className="px-2 py-0.5 text-xs text-muted-foreground">
+                                    +{issue.labels.length - 3}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
+                          <span className="whitespace-nowrap">#{issue.number}</span>
+                          {issue.user && (
+                            <span className="whitespace-nowrap">by {issue.user.login}</span>
+                          )}
+                          <span className="whitespace-nowrap">
+                            {new Date(issue.created_at).toLocaleDateString()}
+                          </span>
+                          {issue.comments > 0 && (
+                            <span className="whitespace-nowrap flex items-center gap-1">
+                              <GitBranch className="h-3 w-3" />
+                              {issue.comments}
+                            </span>
                           )}
                         </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
-                        <span className="whitespace-nowrap">#{issue.number}</span>
-                        {issue.user && (
-                          <span className="whitespace-nowrap">by {issue.user.login}</span>
-                        )}
-                        <span className="whitespace-nowrap">
-                          {new Date(issue.created_at).toLocaleDateString()}
-                        </span>
-                        {issue.comments > 0 && (
-                          <span className="whitespace-nowrap flex items-center gap-1">
-                            <GitBranch className="h-3 w-3" />
-                            {issue.comments}
-                          </span>
-                        )}
-                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </a>
-            </Card>
-          ))}
-        </div>
+                  </CardContent>
+                </a>
+              </Card>
+            ))}
+          </div>
+          {hasMore && (
+            <div className="flex justify-center pt-4">
+              <Button variant="outline" onClick={loadMoreIssues} disabled={loadingMore}>
+                {loadingMore ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      Loading...
+                    </div>
+                  </>
+                ) : (
+                  "Load More"
+                )}
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

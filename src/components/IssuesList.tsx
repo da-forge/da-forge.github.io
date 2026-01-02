@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
-import { AlertCircle, GitBranch, Circle } from "lucide-react";
+import { AlertCircle, GitBranch, Circle, Search, X } from "lucide-react";
 import { githubClient, type GitHubIssue, type ApiError } from "@/lib/github-api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 
 type LoadingState = "loading" | "success" | "error";
 type IssueState = "open" | "closed" | "all";
@@ -20,6 +21,17 @@ export function IssuesList() {
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     async function loadIssues() {
@@ -35,11 +47,35 @@ export function IssuesList() {
       setHasMore(false);
 
       try {
-        const issuesData = await githubClient.getIssues(owner, repo, issueState, 1, PER_PAGE);
+        let issuesData: GitHubIssue[];
+        let totalCount = 0;
+
+        if (debouncedSearchQuery.trim()) {
+          // Use search API
+          const searchResults = await githubClient.searchIssues(
+            owner,
+            repo,
+            debouncedSearchQuery,
+            issueState,
+            1,
+            PER_PAGE,
+          );
+          issuesData = searchResults.items;
+          totalCount = searchResults.total_count;
+        } else {
+          // Use regular API
+          issuesData = await githubClient.getIssues(owner, repo, issueState, 1, PER_PAGE);
+          totalCount = issuesData.length;
+        }
+
         // Filter out pull requests (they have pull_request property)
         const issuesOnly = issuesData.filter((issue) => !issue.pull_request);
         setIssues(issuesOnly);
-        setHasMore(issuesData.length === PER_PAGE);
+        setHasMore(
+          debouncedSearchQuery.trim()
+            ? issuesOnly.length < totalCount
+            : issuesData.length === PER_PAGE,
+        );
         setState("success");
       } catch (err) {
         setState("error");
@@ -55,7 +91,7 @@ export function IssuesList() {
     }
 
     loadIssues();
-  }, [owner, repo, issueState]);
+  }, [owner, repo, issueState, debouncedSearchQuery]);
 
   const loadMoreIssues = async () => {
     if (loadingMore || !hasMore) return;
@@ -63,18 +99,36 @@ export function IssuesList() {
     setLoadingMore(true);
     try {
       const nextPage = currentPage + 1;
-      const issuesData = await githubClient.getIssues(
-        owner!,
-        repo!,
-        issueState,
-        nextPage,
-        PER_PAGE,
-      );
+      let issuesData: GitHubIssue[];
+      let totalCount = 0;
+
+      if (debouncedSearchQuery.trim()) {
+        // Use search API
+        const searchResults = await githubClient.searchIssues(
+          owner!,
+          repo!,
+          debouncedSearchQuery,
+          issueState,
+          nextPage,
+          PER_PAGE,
+        );
+        issuesData = searchResults.items;
+        totalCount = searchResults.total_count;
+      } else {
+        // Use regular API
+        issuesData = await githubClient.getIssues(owner!, repo!, issueState, nextPage, PER_PAGE);
+        totalCount = issuesData.length;
+      }
+
       // Filter out pull requests (they have pull_request property)
       const issuesOnly = issuesData.filter((issue) => !issue.pull_request);
       setIssues((prev) => [...prev, ...issuesOnly]);
       setCurrentPage(nextPage);
-      setHasMore(issuesData.length === PER_PAGE);
+      setHasMore(
+        debouncedSearchQuery.trim()
+          ? issues.length + issuesOnly.length < totalCount
+          : issuesData.length === PER_PAGE,
+      );
     } catch (err) {
       const apiError = err as ApiError;
       setError(apiError.message || "Failed to load more issues");
@@ -82,6 +136,11 @@ export function IssuesList() {
       setLoadingMore(false);
     }
   };
+
+  const clearSearch = useCallback(() => {
+    setSearchQuery("");
+    setDebouncedSearchQuery("");
+  }, []);
 
   if (state === "loading") {
     return (
@@ -133,6 +192,27 @@ export function IssuesList() {
 
   return (
     <div className="space-y-4">
+      {/* Search Input */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          type="text"
+          placeholder="Search issues..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9 pr-9"
+        />
+        {searchQuery && (
+          <button
+            onClick={clearSearch}
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-label="Clear search"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
       {/* State Filter Tabs */}
       <div className="flex gap-2 border-b border-border pb-2">
         <Button

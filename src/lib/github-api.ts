@@ -369,6 +369,70 @@ class GitHubClient {
     });
     return this.request(`/search/repositories?${params.toString()}`);
   }
+
+  /**
+   * Search issues in a repository
+   */
+  async searchIssues(
+    owner: string,
+    repo: string,
+    query: string,
+    state: "open" | "closed" | "all" = "open",
+    page = 1,
+    perPage = 30,
+  ): Promise<{
+    total_count: number;
+    incomplete_results: boolean;
+    items: GitHubIssue[];
+  }> {
+    // Build search query: repo:owner/repo type:issue state:open/closed query
+    let searchQuery = `repo:${owner}/${repo} type:issue`;
+    if (state !== "all") {
+      searchQuery += ` state:${state}`;
+    }
+    if (query.trim()) {
+      searchQuery += ` ${query.trim()}`;
+    }
+    const params = new URLSearchParams({
+      q: searchQuery,
+      page: page.toString(),
+      per_page: perPage.toString(),
+    });
+    // Don't cache search results as they're dynamic
+    return this.request(`/search/issues?${params.toString()}`, {}, false);
+  }
+
+  /**
+   * Search pull requests in a repository
+   */
+  async searchPullRequests(
+    owner: string,
+    repo: string,
+    query: string,
+    state: "open" | "closed" | "all" = "open",
+    page = 1,
+    perPage = 30,
+  ): Promise<{
+    total_count: number;
+    incomplete_results: boolean;
+    items: GitHubPullRequest[];
+  }> {
+    // Build search query: repo:owner/repo type:pr state:open/closed query
+    let searchQuery = `repo:${owner}/${repo} type:pr`;
+    if (state !== "all") {
+      searchQuery += ` state:${state}`;
+    }
+    if (query.trim()) {
+      searchQuery += ` ${query.trim()}`;
+    }
+    const params = new URLSearchParams({
+      q: searchQuery,
+      page: page.toString(),
+      per_page: perPage.toString(),
+    });
+    // Don't cache search results as they're dynamic
+    return this.request(`/search/issues?${params.toString()}`, {}, false);
+  }
 }
 
 // Export a singleton instance

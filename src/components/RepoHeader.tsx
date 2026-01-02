@@ -1,5 +1,15 @@
-import { GitFork, Star, Eye, Book, Scale, ExternalLink } from "lucide-react";
+import {
+  GitFork,
+  Star,
+  Eye,
+  Book,
+  Scale,
+  ExternalLink,
+  GitPullRequest,
+  Circle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Link, useLocation } from "react-router-dom";
 import { type GitHubRepository } from "@/lib/github-api";
 
 interface RepoHeaderProps {
@@ -7,12 +17,24 @@ interface RepoHeaderProps {
 }
 
 export function RepoHeader({ repo }: RepoHeaderProps) {
+  const location = useLocation();
+  const basePath = `/r/${repo.owner.login}/${repo.name}`;
+
+  // Determine active tab based on current path
+  const getActiveTab = () => {
+    if (location.pathname.includes("/issues")) return "issues";
+    if (location.pathname.includes("/pulls")) return "pulls";
+    return "readme";
+  };
+
+  const activeTab = getActiveTab();
+
   return (
     <div className="border-b border-border pb-6 mb-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
-            <Book className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+            <Book className="h-5 w-5 text-muted-foreground shrink-0" />
             <h1 className="text-2xl font-semibold truncate">
               <a href={`/r/${repo.owner.login}`} className="text-blue-600 hover:underline">
                 {repo.owner.login}
@@ -121,6 +143,47 @@ export function RepoHeader({ repo }: RepoHeaderProps) {
           ))}
         </div>
       )}
+
+      {/* Navigation Tabs */}
+      <div className="flex gap-1 mt-6 border-b border-border -mb-6 overflow-x-auto">
+        <Link
+          to={basePath}
+          className={`px-3 sm:px-4 py-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
+            activeTab === "readme"
+              ? "border-primary text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground"
+          }`}
+        >
+          README
+        </Link>
+        <Link
+          to={`${basePath}/issues`}
+          className={`px-3 sm:px-4 py-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-1.5 whitespace-nowrap ${
+            activeTab === "issues"
+              ? "border-primary text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground"
+          }`}
+        >
+          <Circle className="h-4 w-4 shrink-0" />
+          <span>Issues</span>
+          {repo.open_issues_count > 0 && (
+            <span className="px-1.5 py-0.5 text-xs bg-muted rounded-full shrink-0">
+              {repo.open_issues_count}
+            </span>
+          )}
+        </Link>
+        <Link
+          to={`${basePath}/pulls`}
+          className={`px-3 sm:px-4 py-2 text-sm font-medium transition-colors border-b-2 flex items-center gap-1.5 whitespace-nowrap ${
+            activeTab === "pulls"
+              ? "border-primary text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground"
+          }`}
+        >
+          <GitPullRequest className="h-4 w-4 shrink-0" />
+          <span>Pull Requests</span>
+        </Link>
+      </div>
     </div>
   );
 }

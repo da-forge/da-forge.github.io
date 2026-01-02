@@ -79,6 +79,66 @@ export interface ApiError {
   documentation_url?: string;
 }
 
+export interface GitHubIssue {
+  id: number;
+  number: number;
+  title: string;
+  body: string | null;
+  state: "open" | "closed";
+  locked: boolean;
+  user: GitHubUser;
+  labels: Array<{
+    id: number;
+    name: string;
+    color: string;
+    description: string | null;
+  }>;
+  assignee: GitHubUser | null;
+  assignees: GitHubUser[];
+  milestone: {
+    id: number;
+    number: number;
+    title: string;
+    description: string | null;
+    state: "open" | "closed";
+  } | null;
+  comments: number;
+  created_at: string;
+  updated_at: string;
+  closed_at: string | null;
+  pull_request?: {
+    url: string;
+    html_url: string;
+    diff_url: string;
+    patch_url: string;
+  };
+  html_url: string;
+  url: string;
+}
+
+export interface GitHubPullRequest extends GitHubIssue {
+  merged: boolean;
+  mergeable: boolean | null;
+  mergeable_state: string;
+  merged_at: string | null;
+  merge_commit_sha: string | null;
+  head: {
+    label: string;
+    ref: string;
+    sha: string;
+    user: GitHubUser;
+    repo: GitHubRepository | null;
+  };
+  base: {
+    label: string;
+    ref: string;
+    sha: string;
+    user: GitHubUser;
+    repo: GitHubRepository;
+  };
+  draft: boolean;
+}
+
 // ============ API Client ============
 
 class GitHubClient {
@@ -246,6 +306,46 @@ class GitHubClient {
    */
   async getContributors(owner: string, repo: string, perPage = 10): Promise<GitHubUser[]> {
     return this.request<GitHubUser[]>(`/repos/${owner}/${repo}/contributors?per_page=${perPage}`);
+  }
+
+  // ============ Issues Endpoints ============
+
+  /**
+   * Get repository issues
+   */
+  async getIssues(
+    owner: string,
+    repo: string,
+    state: "open" | "closed" | "all" = "open",
+    page = 1,
+    perPage = 30,
+  ): Promise<GitHubIssue[]> {
+    const params = new URLSearchParams({
+      state,
+      page: page.toString(),
+      per_page: perPage.toString(),
+    });
+    return this.request<GitHubIssue[]>(`/repos/${owner}/${repo}/issues?${params.toString()}`);
+  }
+
+  // ============ Pull Requests Endpoints ============
+
+  /**
+   * Get repository pull requests
+   */
+  async getPullRequests(
+    owner: string,
+    repo: string,
+    state: "open" | "closed" | "all" = "open",
+    page = 1,
+    perPage = 30,
+  ): Promise<GitHubPullRequest[]> {
+    const params = new URLSearchParams({
+      state,
+      page: page.toString(),
+      per_page: perPage.toString(),
+    });
+    return this.request<GitHubPullRequest[]>(`/repos/${owner}/${repo}/pulls?${params.toString()}`);
   }
 
   // ============ Search Endpoints ============

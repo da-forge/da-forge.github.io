@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { Loader2, AlertCircle } from "lucide-react";
 import { githubClient, type GitHubRepository, type ApiError } from "@/lib/github-api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RepoHeader } from "./RepoHeader";
 import { ReadmeViewer } from "./ReadmeViewer";
+import { IssuesList } from "./IssuesList";
+import { PullRequestsList } from "./PullRequestsList";
 
 type LoadingState = "loading" | "success" | "error";
 
@@ -99,18 +101,27 @@ export function RepositoryView() {
     <div className="container mx-auto px-4 py-8">
       <RepoHeader repo={repository} />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">{readmeData?.name || "README"}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ReadmeViewer
-            content={readmeData?.content || ""}
-            filename={readmeData?.name || ""}
-            baseUrl={rawContentBaseUrl}
-          />
-        </CardContent>
-      </Card>
+      <Routes>
+        <Route path="issues" element={<IssuesList />} />
+        <Route path="pulls" element={<PullRequestsList />} />
+        <Route
+          path=""
+          element={
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">{readmeData?.name || "README"}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ReadmeViewer
+                  content={readmeData?.content || ""}
+                  filename={readmeData?.name || ""}
+                  baseUrl={rawContentBaseUrl}
+                />
+              </CardContent>
+            </Card>
+          }
+        />
+      </Routes>
     </div>
   );
 }
